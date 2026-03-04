@@ -18,7 +18,11 @@ const poblarProductos = async (request, response) => {
             if (catResult.rows.length > 0) {
                 id_categoria = catResult.rows[0].id;
             } else {
-                const insertCat = `INSERT INTO categoria (nombre)VALUES ($1) RETURNING id `;
+                const insertCat = `
+                    INSERT INTO categoria (nombre)
+                    VALUES ($1)
+                    RETURNING id
+                `;
                 const newCat = await pool.query(insertCat, [category]);
                 id_categoria = newCat.rows[0].id;
             }
@@ -46,45 +50,145 @@ const poblarProductos = async (request, response) => {
     }
 };
 
-const buscarProductos = async (request, response) => {
+const buscarProducto = async (request, response) => {
     try {
-        const { texto } = request.params;
-
-
-        const query = `SELECT p.*, c.nombre AS categoria FROM productos p
-            JOIN categoria c ON p.id_categoria = c.id WHERE p.nombre ILIKE $1
+        const { termino } = request.params;
+        
+        const query = `
+            SELECT p.*, c.nombre as categoria_nombre
+            FROM productos p
+            LEFT JOIN categoria c ON p.id_categoria = c.id
+            WHERE LOWER(p.nombre) LIKE LOWER($1)
         `;
-
-        const resultado = await pool.query(query, [`%${texto}%`]);
-
-        response.status(200).json({
-            cantidad: resultado.rows.length,
-            productos: resultado.rows
-        });
-
+        
+        const result = await pool.query(query, [`%${termino}%`]);
+        
+        if (result.rows.length === 0) {
+            return response.status(404).json({
+                mensaje: "No se encontraron productos con ese término"
+            });
+        }
+        
+        response.status(200).json(result.rows);
     } catch (error) {
         console.log(`Error: ${error}`);
-        response.status(500).json({ error: error.message });
-    }
-};
-
-const buscarCategoria = async (request, response)=> {
-    try{
-        const {texto} = request.params;
-
-        const query = `
-        SELECT * FROM categoria
-        WHERE nombre ILIKE $1`;
-
-        const resultado = await pool.query(query, [`%${texto}%`]);
-
-        response.status(200).json({
-            cantidad:resultado.rows.length,
-            categorias: resultado.rows
-        });
-    }catch(error){
         response.status(500).json({error: error.message});
     }
 };
 
-module.exports = { poblarProductos, buscarProductos, buscarCategoria };
+const buscarCategoria = async (request, response) => {
+    try {
+        const { termino } = request.params;
+        
+        const query = `
+            SELECT c.*, COUNT(p.id) as total_productos
+            FROM categoria c
+            LEFT JOIN productos p ON c.id = p.id_categoria
+            WHERE LOWER(c.nombre) LIKE LOWER($1)
+            GROUP BY c.id
+        `;
+        
+        const result = await pool.query(query, [`%${termino}%`]);
+        
+        if (result.rows.length === 0) {
+            return response.status(404).json({
+                mensaje: "No se encontraron categorías con ese término"
+            });
+        }
+        
+        response.status(200).json(result.rows);
+    } catch (error) {
+        console.log(`Error: ${error}`);
+        response.status(500).json({error: error.message});
+    }
+};
+const obtenerProductos = async (req, res) => {
+    try {
+        const consulta = `
+            SELECT 
+                p.id,
+                p.nombre,
+                p.descripcion,
+                p.precio,
+                p.stock,
+                p.imagen_url,
+                c.nombre as categoria
+            FROM productos p
+            LEFT JOIN categoria c ON p.id_categoria = c.id
+            ORDER BY p.id ASC
+        `;
+        const resultado = await pool.query(consulta);
+        res.status(200).json(resultado.rows);
+    } catch (error) {
+        console.error(`Error: ${error}`);
+        res.status(500).json({ error: error.message });
+    }
+};
+const buscarProductos = async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q || q.trim() === '') {
+            return res.status(400).json({ 
+                error: 'El parámetro "q" es requerido y no puede estar vacío'
+            });
+        }
+        const consulta = `
+            SELECT 
+                p.id,
+                p.nombre,
+                p.descripcion,
+                p.precio,
+                p.stock,
+                p.imagen_url,
+                c.nombre as categoria
+            FROM productos p
+            LEFT JOIN categoria c ON p.id_categoria = c.id
+            WHERE 
+                p.nombre ILIKE $1 
+                OR p.descripcion ILIKE $1
+                OR c.nombre ILIKE $1
+            ORDER BY p.nombre ASC
+        `;
+        const termino = `%${q}%`;
+        const resultado = await pool.query(consulta, [termino]);
+        
+        res.status(200).json({
+            cantidad: resultado.rows.length,
+            resultados: resultado.rows
+        });
+    } catch (error) {
+        console.error(`Error: ${error}`);
+        res.status(500).json({ error: error.message });
+    }
+    
+};
+
+const crearProducto= async (req, res) => {
+        try{
+            const { nombre, precio, stock, descripcion, imagenUrl, id_categoria} = req.body;
+            
+            if(!nombre || !precio ){
+                return res.status(400).json({error: "Valores requeridos"});
+            }
+
+            const query = `INSERT INTO productos
+                (nombre, precio, stock, descripcion, imagen_url, id_categoria)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING *`;
+            
+
+            const response = await pool.query(query, [nombre, precio, stock || 0, descripcion || '', imagenUrl || '', id_categoria]);
+            res.status(201).json({
+                mensaje: "Producto creado exitosamente",
+                producto: response.rows[0]
+            });
+        }catch(error){
+            console.error(`Error: ${error}`);
+            res.status(500).json({ error: error.message });
+        }
+    };
+
+
+
+
+module.exports = {poblarProductos, buscarProducto, buscarCategoria, obtenerProductos, buscarProductos, crearProducto};
