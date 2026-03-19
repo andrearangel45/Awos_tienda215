@@ -30,11 +30,11 @@ const poblarProductos = async (request, response) => {
 
             const query = `
                 INSERT INTO productos
-                (nombre, precio, stock, descripcion, imagen_url,id_categoria)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                (nombre, precio, stock, descripcion, imagen_url,id_categoria, youtube_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
             `
 
-            await pool.query(query, [title, price, stock, description, image, id_categoria]);
+            await pool.query(query, [title, price, stock, description, image, id_categoria, null]);
 
             inserciones++;
         }
@@ -112,6 +112,7 @@ const obtenerProductos = async (req, res) => {
                 p.precio,
                 p.stock,
                 p.imagen_url,
+                p.youtube_id,
                 c.nombre as categoria
             FROM productos p
             LEFT JOIN categoria c ON p.id_categoria = c.id
@@ -140,6 +141,7 @@ const buscarProductos = async (req, res) => {
                 p.precio,
                 p.stock,
                 p.imagen_url,
+                p.youtube_id,
                 c.nombre as categoria
             FROM productos p
             LEFT JOIN categoria c ON p.id_categoria = c.id
@@ -165,19 +167,19 @@ const buscarProductos = async (req, res) => {
 
 const crearProducto= async (req, res) => {
         try{
-            const { nombre, precio, stock, descripcion, imagenUrl, id_categoria} = req.body;
+            const { nombre, precio, stock, descripcion, imagenUrl, id_categoria, youtube_id} = req.body;
             
             if(!nombre || !precio ){
                 return res.status(400).json({error: "Valores requeridos"});
             }
 
             const query = `INSERT INTO productos
-                (nombre, precio, stock, descripcion, imagen_url, id_categoria)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                (nombre, precio, stock, descripcion, imagen_url, id_categoria, youtube_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 RETURNING *`;
             
 
-            const response = await pool.query(query, [nombre, precio, stock || 0, descripcion || '', imagenUrl || '', id_categoria]);
+            const response = await pool.query(query, [nombre, precio, stock || 0, descripcion || '', imagenUrl || '', id_categoria, youtube_id || null]);
             res.status(201).json({
                 mensaje: "Producto creado exitosamente",
                 producto: response.rows[0]
