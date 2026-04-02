@@ -34,7 +34,8 @@ const poblarProductos = async (request, response) => {
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
             `
 
-            await pool.query(query, [title, price, stock, description, image, id_categoria, null]);
+            await pool.query(query, [title, price, stock, description, image, id_categoria, null, null, null]);
+
 
             inserciones++;
         }
