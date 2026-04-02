@@ -8,7 +8,7 @@ const registrar= async(req, res)=>{
     try{
         const userExists= await pool.query('SELECT * from usuarios where email=$1', [email]);
         if(userExists.rows.length>0){
-            res.status(400).json({mensaje: 'El usuario ya existe'});
+            return res.status(400).json({mensaje: 'El usuario ya existe'});
         }
         
         const salt= await bcrypt.genSalt(10);
